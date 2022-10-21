@@ -1,0 +1,1026 @@
+---
+title: "sleep_gsem_github"
+author: "Claire Morrison"
+date: "10/20/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+require(GenomicSEM)
+load("/Users/clairemorrison/Documents/IBG:Lab/sleep_psychopathology/gsemfinal/output/sleep_psychNEWldsc.RData")
+```
+
+### download all sleep sumstats
+## calc effective N
+
+```{r insosmnia eff N}
+insom<-fread("Saxena_fullUKBB_Insomnia_summary_stats.txt",header=T, data.table=FALSE)
+
+#convert allele frequency column to minor allele frequency for effective sample size calculation below
+insom$MAF<-ifelse(insom$A1FREQ > .5, 1-insom$A1FREQ, insom$A1FREQ)
+
+#remove Freq column now that we have created MAF column
+insom$A1FREQ<-NULL
+
+#calculate SNP-specific sum of effective sample size
+insom$Neff<-4/((2*insom$MAF*(1-insom$MAF))*insom$SE_INSOMNIA^2)
+
+#calculate total effective N to cap backed out Neff
+#these are the case control numbers from table 1 of Howard et al. (2019)
+#note that these numbers exclude 23andMe
+Ncases<-129270
+Ncontrols<-108357
+v<-Ncases/(Ncases+Ncontrols)
+TotalNeff<-4*v*(1-v)*(Ncases+Ncontrols)
+
+#cap at 1.1 of total effective N
+insom$Neff<-ifelse(insom$Neff > 1.1*TotalNeff, 1.1*TotalNeff, insom$Neff)
+
+#lower limit of 0.5 of total effective N
+insom$Neff<-ifelse(insom$Neff < 0.5*TotalNeff, 0.5*TotalNeff, insom$Neff)
+
+#output the updated  file
+write.table(insom, file = "cleaned/inosmia_withNeff.txt", sep = "\t", quote=FALSE,row.names=FALSE,col.names=TRUE)
+
+```
+
+```{r short sleep}
+shortsleep<-fread("shortsumstats.txt",header=T, data.table=FALSE)
+
+#convert allele frequency column to minor allele frequency for effective sample size calculation below
+shortsleep$MAF<-ifelse(shortsleep$A1FREQ > .5, 1-shortsleep$A1FREQ, shortsleep$A1FREQ)
+
+#remove Freq column now that we have created MAF column
+shortsleep$A1FREQ<-NULL
+
+#calculate SNP-specific sum of effective sample size
+shortsleep$Neff<-4/((2*shortsleep$MAF*(1-shortsleep$MAF))*shortsleep$SE_SHORTSLEEP^2)
+
+#calculate total effective N to cap backed out Neff
+#these are the case control numbers from table 1 of Howard et al. (2019)
+#note that these numbers exclude 23andMe
+Ncases<-106192
+Ncontrols<-305742
+v<-Ncases/(Ncases+Ncontrols)
+TotalNeff<-4*v*(1-v)*(Ncases+Ncontrols)
+
+#cap at 1.1 of total effective N
+shortsleep$Neff<-ifelse(shortsleep$Neff > 1.1*TotalNeff, 1.1*TotalNeff, shortsleep$Neff)
+
+#lower limit of 0.5 of total effective N
+shortsleep$Neff<-ifelse(shortsleep$Neff < 0.5*TotalNeff, 0.5*TotalNeff, shortsleep$Neff)
+
+#output the updated  file
+write.table(shortsleep, file = "cleaned/shortsleep_withNeff.txt", sep = "\t", quote=FALSE,row.names=FALSE,col.names=TRUE)
+```
+
+```{r long sleep}
+longsleep<-fread("longsumstats.txt",header=T, data.table=FALSE)
+
+#convert allele frequency column to minor allele frequency for effective sample size calculation below
+longsleep$MAF<-ifelse(longsleep$A1FREQ > .5, 1-longsleep$A1FREQ, longsleep$A1FREQ)
+
+#remove Freq column now that we have created MAF column
+longsleep$A1FREQ<-NULL
+
+#calculate SNP-specific sum of effective sample size
+longsleep$Neff<-4/((2*longsleep$MAF*(1-longsleep$MAF))*longsleep$SE_LONGSLEEP^2)
+
+#calculate total effective N to cap backed out Neff
+#these are the case control numbers from table 1 of Howard et al. (2019)
+#note that these numbers exclude 23andMe
+Ncases<-34184
+Ncontrols<-305742
+v<-Ncases/(Ncases+Ncontrols)
+TotalNeff<-4*v*(1-v)*(Ncases+Ncontrols)
+
+#cap at 1.1 of total effective N
+longsleep$Neff<-ifelse(longsleep$Neff > 1.1*TotalNeff, 1.1*TotalNeff, longsleep$Neff)
+
+#lower limit of 0.5 of total effective N
+longsleep$Neff<-ifelse(longsleep$Neff < 0.5*TotalNeff, 0.5*TotalNeff, longsleep$Neff)
+
+#output the updated  file
+write.table(longsleep, file = "cleaned/longsleep_withNeff.txt", sep = "\t", quote=FALSE,row.names=FALSE,col.names=TRUE)
+```
+
+
+## clean files
+
+```{r}
+rm(list = ls(all.names = TRUE))
+### clear workspace between files
+### ** don't want A0 --> rename to be A2 **
+#1) insom: see above
+
+#2) chrono
+chron<- fread("chronotype_raw_BOLT.output_HRC.only_plus.metrics_maf0.001_hwep1em12_info0.3.txt", header=T, data.table=F)
+head(chron)
+chron$HWE_P<- NULL
+colnames(chron)[10]<- 'p'
+colnames(chron)[4:6]<- c('A1', 'A0', 'MAF')
+chron$N<- rep(449734, 1, nrow(chron))
+fwrite(chron, "cleaned/chronotype.txt", sep='\t')
+
+#3) mid
+accel<- fread("accel_GWAS_all_BOLT.output_HRC.only_plus.metrics_maf0.001_hwep1em12_info0.3.txt", header=T, data.table=F)
+mid<- accel[,c(1:6, 65:71)]
+mid<- mid[,c(1:6,10:13)] ### using rank normalized variables ("_raw_sin")
+colnames(mid)[7:10]<- c('MAF', 'beta', 'SE', 'p')
+mid$N<- rep(84810,1,nrow(mid))
+fwrite(mid, "cleaned/mid.txt", sep='\t')
+
+#4) m10
+m10<- accel[,c(1:6, 65:71)]
+m10<- m10[,c(1:6,11:14)] ### using rank normalized variables ("_raw_sin")
+colnames(m10)[7:10]<- c('MAF', 'beta', 'SE', 'p')
+m10$N<- rep(85670,1,nrow(m10))
+fwrite(m10, "cleaned/m10.txt", sep='\t')
+
+#5) l5
+l5<- accel[,c(1:6, 16:23)]
+l5<- l5[,c(1:6,11:14)] ### using rank normalized variables ("_raw_sin")
+colnames(l5)[7:10]<- c('MAF', 'beta', 'SE', 'p')
+l5$N<- rep(85205,1,nrow(l5))
+fwrite(l5, "cleaned/l5.txt", sep='\t')
+
+#6) episodes
+episodes<- accel[,c(1:6, 32:39)]
+episodes<- episodes[,c(1:6,11:14)] ### using rank normalized variables ("_raw_sin")
+colnames(episodes)[7:10]<- c('MAF', 'beta', 'SE', 'p')
+episodes$N<- rep(84810,1,nrow(episodes))
+fwrite(episodes, "cleaned/episodes.txt", sep='\t')
+
+#7) efficiency
+effic<- accel[,c(1:6, 56:63)]
+effic<- effic[,c(1:6,11:14)] ### using rank normalized variables ("_raw_sin")
+colnames(effic)[7:10]<- c('MAF', 'beta', 'SE', 'p')
+effic$N<- rep(84810,1,nrow(effic))
+fwrite(effic, "cleaned/effic.txt", sep='\t')
+
+#8) sleepiness
+sleepy<- fread("Saxena.fullUKBB.DaytimeSleepiness.sumstats.txt", header=T, data.table=F)
+colnames(sleepy)[4:6]<- c('A1', 'A2', 'MAF')
+sleepy$N<- rep(452071, 1, nrow(sleepy))
+fwrite(sleepy, "cleaned/sleepiness.txt", sep='\t')
+
+#9) napping 
+naps<- fread("bolt_453K_geneticEurCluster.Nap_noBMI_VM.bgen.stats_HRC_1KG_LDSC_cleaned.txt", header=T, data.table=F)
+colnames(naps)[6]<- 'MAF'
+fwrite(naps, "cleaned/naps.txt", sep='\t')
+
+#10) diurnal
+diurn<- accel[,c(1:6, 8:15)]
+diurn<- diurn[,c(1:6,11:14)] ### using rank normalized variables ("_raw_sin")
+colnames(diurn)[7:10]<- c('MAF', 'beta', 'SE', 'p')
+diurn$N<- rep(84757,1,nrow(diurn))
+fwrite(diurn, "cleaned/diurn.txt", sep='\t')
+
+#11) sleep dur acti
+actisleepdur<- accel[,c(1:6, 40:47)]
+actisleepdur<- actisleepdur[,c(1:6,11:14)] ### using rank normalized variables ("_raw_sin")
+colnames(actisleepdur)[7:10]<- c('MAF', 'beta', 'SE', 'p')
+actisleepdur$N<- rep(85449,1,nrow(actisleepdur))
+fwrite(actisleepdur, "cleaned/actisleepdur.txt", sep='\t')
+
+#12) sleep dur self
+selfsleepdur<- fread("sleepdurationsumstats.txt", header=T, data.table=F)
+colnames(selfsleepdur)[4:6]<- c('A1', 'A0', 'MAF')
+colnames(selfsleepdur)[8:10]<- c('beta', 'se', 'p')
+selfsleepdur$N<- rep(446118, 1, nrow(selfsleepdur))
+fwrite(selfsleepdur, "cleaned/selfsleepdur.txt", sep='\t')
+
+#13) sd sleep dur
+sdsleepdur<- accel[,c(1:6, 48:55)]
+sdsleepdur<- sdsleepdur[,c(1:6,11:14)] ### using rank normalized variables ("_raw_sin")
+colnames(sdsleepdur)[7:10]<- c('MAF', 'beta', 'SE', 'p')
+sdsleepdur$N<- rep(84441,1,nrow(sdsleepdur))
+fwrite(sdsleepdur, "cleaned/sdsleepdur.txt", sep='\t')
+
+```
+
+
+## munge
+
+```{r}
+#create vector of the summary statistics files
+
+require(GenomicSEM)
+files<-c("cleaned/chronotype.txt", "cleaned/mid.txt", "cleaned/l5.txt", "cleaned/m10.txt",
+         "cleaned/episodes.txt", "cleaned/effic.txt",
+         "cleaned/sleepiness.txt", "cleaned/naps.txt", "cleaned/diurn.txt",
+         "cleaned/actisleepdur.txt", "cleaned/selfsleepdur.txt",
+         "cleaned/sdsleepdur.txt",
+         "cleaned/insomnia_withNeff.txt",
+         "cleaned/shortsleep_withNeff.txt",
+         "cleaned/longsleep_withNeff.txt")
+
+#define the reference file being used to allign alleles across summary stats
+#here we are using hapmap3
+hm3<-"../eur_w_ld_chr/w_hm3.snplist"
+
+#name the traits 
+trait.names<-c("chron","mid", "l5", "m10",
+               "episodes", "efficiency",
+               "sleepiness", "napping", "diurnal",
+               "acti_sleepdur", "self_sleepdur",
+               "sd_sleepdur",
+               "insom",
+               "shortsleep", "longsleep")
+
+#list the sample sizes. All but PTSD have SNP-specific sum of effective sample sizes so only its
+#sample size is listed here
+N=c(NA,NA,NA,NA,
+    NA,NA,
+    NA,NA,NA,
+    NA,NA,
+    NA,
+    NA,
+    NA,NA)
+
+#definte the imputation quality filter
+info.filter=0.9
+
+#define the MAF filter
+maf.filter=0.01
+
+#run munge
+munge(files=files,hm3=hm3,trait.names=trait.names,N=N,info.filter=info.filter,maf.filter=maf.filter)
+```
+
+## reverse code so all indicators reflect better health
+
+```{r}
+
+mid<- fread("mid.sumstats.gz", header=T, data.table=F)
+mid$Z<- mid$Z*(-1)
+fwrite(mid, "midR.sumstats.gz", sep='\t')
+
+m10<- fread("m10.sumstats.gz", header=T, data.table=F)
+m10$Z<- m10$Z*(-1)
+fwrite(m10, "m10R.sumstats.gz", sep='\t')
+
+l5<- fread("l5.sumstats.gz", header=T, data.table=F)
+l5$Z<- l5$Z*(-1)
+fwrite(l5, "l5R.sumstats.gz", sep='\t')
+
+ep<- fread("episodes.sumstats.gz", header=T, data.table=F)
+ep$Z<- ep$Z*(-1)
+fwrite(ep, "episodesR.sumstats.gz", sep='\t')
+
+sleepy<- fread("sleepiness.sumstats.gz", header=T, data.table=F)
+sleepy$Z<- sleepy$Z*(-1)
+fwrite(sleepy, "sleepinessR.sumstats.gz", sep='\t')
+
+diurn<- fread("diurn.sumstats.gz", header=T, data.table=F)
+diurn$Z<- diurn$Z*(-1)
+fwrite(diurn, "diurnR.sumstats.gz", sep='\t')
+
+naps<- fread("naps.sumstats.gz", header=T, data.table=F)
+naps$Z<- naps$Z*(-1)
+fwrite(naps, "napsR.sumstats.gz", sep='\t')
+
+insom<- fread("insom.sumstats.gz", header=T, data.table=F)
+insom$Z<- insom$Z*(-1)
+fwrite(insom, "insomR.sumstats.gz", sep='\t') 
+
+sd<- fread("sdsleepdur.sumstats.gz", header=T, data.table=F)
+sd$Z<- sd$Z*(-1)
+fwrite(sd, "sdsleepdurR.sumstats.gz", sep='\t')
+
+short<- fread("shortsleep.sumstats.gz", header=T, data.table=F)
+short$Z<- short$Z*(-1)
+fwrite(short,"shortsleepR.sumstats.gz", sep='\t')
+
+long<- fread("longsleep.sumstats.gz", header=T, data.table=F)
+long$Z<- long$Z*(-1)
+fwrite(long, "longsleepR.sumstats.gz", sep='\t')
+
+```
+
+
+## LDSC sleep only
+
+```{r}
+#vector of munged summary statisitcs
+traits<-c("munged/chrono.sumstats.gz", "munged/midR.sumstats.gz", "munged/l5R.sumstats.gz", "munged/m10R.sumstats.gz",
+         "munged/episodesR.sumstats.gz", "munged/effic.sumstats.gz",
+         "munged/sleepinessR.sumstats.gz", "munged/napsR.sumstats.gz", "munged/diurnR.sumstats.gz",
+         "munged/actisleepdur.sumstats.gz", "munged/selfsleepdur.sumstats.gz",
+         "munged/sdsleepdurR.sumstats.gz",
+         "munged/insomR.sumstats.gz",
+         "munged/shortsleepR.sumstats.gz",
+         "munged/longsleepR.sumstats.gz")
+
+#enter sample prevalence of .5 to reflect that all traits were munged using the sum of effective sample size
+sample.prev<-c(NA, NA, NA, NA, 
+               NA, NA, 
+               NA, NA, NA,
+               NA, NA,
+               NA,
+               .54,
+               .26, .10)
+
+#vector of population prevalences
+population.prev<-c(NA, NA, NA, NA, 
+               NA, NA, 
+               NA, NA, NA,
+               NA, NA,
+               NA,
+               .30,
+               .30, .38)
+
+#the folder of LD scores
+ld<-"../eur_w_ld_chr/"
+
+#the folder of LD weights [typically the same as folder of LD scores]
+wld<-"../eur_w_ld_chr/"
+
+#name the traits
+trait.names<-c("chron","midR", "l5R", "m10R",
+               "episodesR", "efficiency",
+               "sleepinessR", "nappingR", "diurnalR",
+               "acti_sleepdur", "self_sleepdur",
+               "sd_sleepdurR",
+               "insomR",
+               "shortsleepR", "longsleepR")
+
+#run LDSC
+sleepLDSC<-ldsc(traits=traits,sample.prev=sample.prev,population.prev=population.prev,ld=ld,wld=wld,trait.names=trait.names)
+
+#optional command to save the output as a .RData file for later use
+save(sleepLDSC,file="sleepLDSC")
+```
+
+### download all sleep sumstats
+## calc effective N
+
+```{r anx}
+anx<- fread("TotAnx_effect_sumstats", header=T, data.table=F)
+#convert allele frequency column to minor allele frequency for effective sample size calculation below
+anx$MAF<-ifelse(anx$af > .5, 1-anx$af, anx$af)
+
+#remove Freq column now that we have created MAF column
+anx$af<-NULL
+
+#calculate SNP-specific sum of effective sample size
+anx$Neff<-4/((2*anx$MAF*(1-anx$MAF))*anx$SE^2)
+
+#calculate total effective N to cap backed out Neff
+#these are the case control numbers from table 1 of Howard et al. (2019)
+#note that these numbers exclude 23andMe
+Ncases<-129270
+Ncontrols<-108357
+v<-Ncases/(Ncases+Ncontrols)
+TotalNeff<-4*v*(1-v)*(Ncases+Ncontrols)
+
+#cap at 1.1 of total effective N
+anx$Neff<-ifelse(anx$Neff > 1.1*TotalNeff, 1.1*TotalNeff, anx$Neff)
+
+#lower limit of 0.5 of total effective N
+anx$Neff<-ifelse(anx$Neff < 0.5*TotalNeff, 0.5*TotalNeff, anx$Neff)
+
+#output the updated  file
+fwrite(anx, "cleaned/anxiety_withNeff.txt", sep = "\t")
+```
+
+```{r depression}
+#read in the data file from Howard et al. (2019)
+MDD<-fread("PGC_UKB_depression_genome-wide.txt",data.table=FALSE)
+
+#convert allele frequency column to minor allele frequency for effective sample size calculation below
+MDD$MAF<-ifelse(MDD$Freq > .5, 1-MDD$Freq, MDD$Freq)
+
+#remove Freq column now that we have created MAF column
+MDD$Freq<-NULL
+
+#calculate SNP-specific sum of effective sample size
+MDD$Neff<-4/((2*MDD$MAF*(1-MDD$MAF))*MDD$StdErrLogOR^2)
+
+#calculate total effective N to cap backed out Neff
+#these are the case control numbers from table 1 of Howard et al. (2019)
+#note that these numbers exclude 23andMe
+Ncases<-127552+43204
+Ncontrols<-233763+95680
+v<-Ncases/(Ncases+Ncontrols)
+TotalNeff<-4*v*(1-v)*(Ncases+Ncontrols)
+
+#cap at 1.1 of total effective N
+MDD$Neff<-ifelse(MDD$Neff > 1.1*TotalNeff, 1.1*TotalNeff, MDD$Neff)
+
+#lower limit of 0.5 of total effective N
+MDD$Neff<-ifelse(MDD$Neff < 0.5*TotalNeff, 0.5*TotalNeff, MDD$Neff)
+
+colnames(MDD)[4:5]<- c('logOR', 'se')
+colnames(MDD)[1]<- 'SNP'
+MDD$A2<- toupper(MDD$A2)
+MDD$A1<- toupper(MDD$A1)
+
+#output the updated MDD file
+fwrite(MDD, "cleaned/MDD_withNeff.txt", sep = "\t")
+```
+
+rm(list = ls(all.names = TRUE))
+```{r ptsd}
+ptsd<- fread("pts_eur_freeze2_overall.results", header=T, data.table=F)
+fwrite(ptsd, "cleaned/ptsd_withNeff.txt", sep='\t')
+```
+
+```{r}
+cud<- fread("CUD_EUR_full_public_11.14.2020", header=T, data.table=F) 
+#calculate sample prevalence for each cohort
+cud$v<-cud$N_CAS/(cud$N_CAS+cud$N_CON)
+
+#calculate cohort specific effective sample size
+cud$EffN<-4*cud$v*(1-cud$v)*(cud$N_CAS+cud$N_CON)
+fwrite(cud, "cleaned/cud_withNeff.txt", sep='\t')
+
+```
+
+```{r}
+adhd<- fread("daner_adhd_meta_filtered_NA_iPSYCH23_PGC11_sigPCs_woSEX_2ell6sd_EUR_Neff_70.meta", header=T, data.table=F)
+fwrite(adhd, "cleaned/adhd.txt", sep='\t')
+```
+
+```{r}
+
+fwrite(cigs, "cleaned/cigs_withNeff.txt", sep='\t')
+```
+
+```{r}
+fwrite(alc, "cleaned/alc_withNeff.txt", sep='\t')
+```
+
+```{r}
+bp<- fread("pgc-bip2021-all.vcf.tsv", header=T, data.table=F)
+```
+
+```{r}
+scz<- fread("daner_PGC_SCZ52_0513a.hq2", header=T, data.table=F)
+
+scz$MAF2<-ifelse(scz$MAF > .5, 1-scz$MAF, scz$MAF)
+
+#remove Freq column now that we have created MAF column
+scz$af<-NULL
+
+#calculate SNP-specific sum of effective sample size
+scz$Neff<-4/((2*scz$MAF*(1-scz$MAF))*scz$SE^2)
+
+#calculate total effective N to cap backed out Neff
+#these are the case control numbers from table 1 of Howard et al. (2019)
+#note that these numbers exclude 23andMe
+Ncases<-34241
+Ncontrols<-45604
+v<-Ncases/(Ncases+Ncontrols)
+TotalNeff<-4*v*(1-v)*(Ncases+Ncontrols)
+
+#cap at 1.1 of total effective N
+scz$Neff<-ifelse(scz$Neff > 1.1*TotalNeff, 1.1*TotalNeff, scz$Neff)
+
+#lower limit of 0.5 of total effective N
+scz$Neff<-ifelse(scz$Neff < 0.5*TotalNeff, 0.5*TotalNeff, scz$Neff)
+
+fwrite(scz, "cleaned/scz_withNeff.txt", sep='\t')
+```
+
+```{r}
+library(dplyr)
+ocd<-fread("ocd_aug2017", header=T, data.table=F)
+ref<-fread("../../gsem/reference.1000G.maf.0.005.txt",data.table=FALSE)
+
+#subset reference file to just SNP and MAF
+attach(ref)
+ref<-data.frame(SNP,MAF)
+
+#merge Anxiety and reference file
+ocd<-inner_join(ocd,ref,by="SNP",all=F)
+
+ocd$Neff<-4/((2*ocd$MAF*(1-ocd$MAF))*ocd$SE^2)
+
+#calculate total effective N to cap backed out Neff
+Ncases<-2688 
+Ncontrols<-7037
+v<-Ncases/(Ncases+Ncontrols)
+TotalNeff<-4*v*(1-v)*(Ncases+Ncontrols)
+
+#cap at 1.1 of total effective N
+ocd$Neff<-ifelse(ocd$Neff > 1.1*TotalNeff, 1.1*TotalNeff, ocd$Neff)
+
+#lower limit of 0.5 of total effective N
+ocd$Neff<-ifelse(ocd$Neff < 0.5*TotalNeff, 0.5*TotalNeff, ocd$Neff)
+
+#remove reference panel MAF from file
+ocd$MAF<-NULL
+fwrite(ocd, "cleaned/ocd_withNeff.txt", sep='\t')
+```
+
+```{r}
+an<- fread("pgcAN2.2019-07.vcf.tsv", header=T, data.table=F)
+fwrite(an, "cleaned/anorexia_withNeff.txt", sep='\t')
+```
+
+## munge
+```{r}
+#create vector of the summary statistics files
+
+### MDD is log OR --> not sure what to do to munge
+
+require(GenomicSEM)
+files<-c("cleaned/MDD_withNeff.txt", "cleaned/ptsd_withNeff.txt", "cleaned/anxiety_withNeff.txt",
+         "cleaned/cigs_withNeff.txt", "cleaned/adhd_withNeff.txt", "cleaned/cud_withNeff.txt", "cleaned/alc_withNeff.txt",
+         "cleaned/scz_withNeff.txt", "cleaned/BiP_withNeff.txt",
+         "cleaned/ocd_withNeff.txt", "cleaned/anorexia_withNeff.txt")
+
+#define the reference file being used to allign alleles across summary stats
+#here we are using hapmap3
+hm3<-"../eur_w_ld_chr/w_hm3.snplist"
+
+#name the traits 
+trait.names<-c("mdd","ptsd", "anx", 
+               "cigs", "adhd", "cud", "alc",
+               "scz", "bp", 
+               "ocd", "an")
+
+#sample size is listed here
+N=c(NA,NA,NA,
+    NA,NA, NA, NA,
+    NA,NA,
+    NA,NA)
+
+#definte the imputation quality filter
+info.filter=0.9
+
+#define the MAF filter
+maf.filter=0.01
+
+#run munge
+munge(files=files,hm3=hm3,trait.names=trait.names,N=N,info.filter=info.filter,maf.filter=maf.filter)
+```
+
+
+
+
+### ldsc psych + sleep
+
+```{r}
+getwd()
+#vector of munged summary statisitcs
+traits<-c("munged/chrono.sumstats.gz", "munged/midR.sumstats.gz", "munged/l5R.sumstats.gz", "munged/m10R.sumstats.gz",
+         "munged/episodesR.sumstats.gz", "munged/effic.sumstats.gz",
+         "munged/sleepinessR.sumstats.gz", "munged/napsR.sumstats.gz", "munged/diurnR.sumstats.gz",
+         "munged/actisleepdur.sumstats.gz", "munged/selfsleepdur.sumstats.gz",
+         "munged/sdsleepdurR.sumstats.gz",
+         "munged/insomR.sumstats.gz",
+         "munged/shortsleep.sumstats.gz",
+         "munged/longsleep.sumstats.gz",
+         "munged/mdd.sumstats.gz", "munged/ptsd.sumstats.gz", "munged/anx.sumstats.gz",
+         "munged/cigs.sumstats.gz", "munged/adhd.sumstats.gz", "munged/cud.sumstats.gz", "munged/alc.sumstats.gz",
+         "munged/scz.sumstats.gz", "munged/bip.sumstats.gz",
+         "munged/ocd.sumstats.gz", "munged/anorexia.sumstats.gz")
+
+#enter sample prevalence of .5 to reflect that all traits were munged using the sum of effective sample size
+sample.prev<-c(NA, NA, NA, NA, 
+               NA, NA, 
+               NA, NA, NA,
+               NA, NA,
+               NA,
+               .54,
+               .26, .10,
+               .34,.13, .54, 
+               NA, .36, .05, NA,
+               .43, .10, 
+               .28, .23)
+
+#vector of population prevalences
+population.prev<-c(NA, NA, NA, NA, 
+               NA, NA, 
+               NA, NA, NA,
+               NA, NA,
+               NA,
+               .30,
+               .30, .38,
+               .15,.08, .20, 
+               NA, .03, .02, NA,
+               .01, .03, 
+               .01, .002)
+
+#the folder of LD scores
+ld<-"eur_w_ld_chr/"
+
+#the folder of LD weights [typically the same as folder of LD scores]
+wld<-"eur_w_ld_chr/"
+
+#name the traits
+trait.names<-c("chron","midR", "l5R", "m10R",
+               "episodesR", "efficiency",
+               "sleepinessR", "nappingR", "diurnalR",
+               "acti_sleepdur", "self_sleepdur",
+               "sd_sleepdurR",
+               "insomR",
+               "shortsleep", "longsleep",
+               "mdd","ptsd", "anx", 
+               "cigs", "adhd", "cud", "alc",
+               "scz", "bp", 
+               "ocd", "an")
+
+#run LDSC
+sleep_psychLDSC<-ldsc(traits=traits,sample.prev=sample.prev,population.prev=population.prev,ld=ld,wld=wld,trait.names=trait.names)
+
+#optional command to save the output as a .RData file for later use
+save(sleep_psychLDSC,file="sleep_psychLDSC.RData")
+```
+
+
+### plot corr matrix
+
+```{r}
+
+
+load("/Users/clairemorrison/Documents/IBG:Lab/sleep_psychopathology/gsemfinal/r&r/sleep_psychLDSC.RData")
+h2<- diag(sleep_psychLDSC$S)
+rgs<- cov2cor(sleep_psychLDSC$S)
+rgs
+h2
+
+diag(rgs)<- diag(sleep_psychLDSC$S)
+rgs
+
+row.names(rgs)<- colnames(rgs)
+dim(rgs)
+colnames(rgs)
+
+
+colnames(rgs)<- c("Chronotype", "Sleep Mid.*",  "L5*", "M10*", "Episodes*", "Efficiency", "Sleepiness*", "Napping*", "Diurnal*", "Sleep Dur Acti.", "Sleep Dur. Self", "SD Sleep Dur*", "Insomnia*", "Short Sleep", "Long Sleep", "MDD", "PTSD", "Anxiety", "Cigs", "ADHD", "CUD", "Alc", "Scz", "BP", "OCD", "AN")
+row.names(rgs)<- colnames(rgs)
+
+rgs<- rgs[c(1:2,4,3,5:7,9,8,11,13,12,14:26), c(1:2,4,3,5:7,9,8,11,13,12,14:26)]
+
+
+rgs[rgs>1]<- 1
+library(corrplot)
+
+
+corrplot(rgs, method = "color",
+         type = "lower",  number.cex = 0.65,
+         addCoef.col = "black", 
+         tl.col = "black", tl.srt = 90) 
+
+
+############ just sleep #############
+
+rgs<- rgs[c(1:9,11:13), c(1:9,11:13)]
+
+corrplot(rgs, method = "color",
+         type = "lower",  number.cex = 0.96,
+         addCoef.col = "black", 
+         tl.col = "black", tl.srt = 90) 
+
+
+```
+
+### FDR correct 
+
+```{r}
+### model 1, sleep health 
+m_1<- "
+effic=~efficiency+episodesR
+alertness=~sleepinessR+diurnalR+nappingR
+timing=~chron+midR+m10R+l5R
+dur=~self_sleepdur
+reg=~sd_sleepdurR
+insom=~insomR
+sd_sleepdurR~~0*sd_sleepdurR
+insomR~~0*insomR
+self_sleepdur~~0*self_sleepdur
+
+efficiency~~a*efficiency
+a>.001
+"
+
+m_1<- usermodel(covstruc=sleep_psychLDSC, model=m_1, 
+                estimation=estimation,std.lv=std.lv, imp_cov = F)
+save(m_1, file="finalmods/m_1.RData")
+
+### model 2, single factor sleep health
+m_2<- "
+sleephealth=~efficiency+episodesR+sleepinessR+diurnalR+nappingR+chron+midR+m10R+l5R+sd_sleepdurR+insomR+self_sleepdur
+"
+
+m_2<- usermodel(covstruc=sleep_psychLDSC, model=m_2, 
+                estimation=estimation,std.lv=std.lv, imp_cov = F)
+save(m_2, file="finalmods/m_2.RData")
+
+
+### model 3, hierarchical sleep health
+m_3<- "
+effic=~1*efficiency+episodesR
+alertness=~1*nappingR+sleepinessR+diurnalR
+timing=~1*chron+midR+m10R+l5R
+dur=~1*self_sleepdur
+reg=~1*sd_sleepdurR
+insom=~1*insomR
+sd_sleepdurR~~0*sd_sleepdurR
+insomR~~0*insomR
+self_sleepdur~~0*self_sleepdur
+
+efficiency~~a*efficiency
+a>.001
+
+
+SH=~NA*effic+alertness+timing+dur+reg+insom
+
+SH~~1*SH
+
+insom~~c*insom
+c>.001
+
+
+"
+
+m_3<- usermodel(covstruc=sleep_psychLDSC, model=m_3, 
+                estimation=estimation,std.lv=F, imp_cov = F)
+save(m_3, file="finalmods/m_3.RData")
+
+
+### model 4, psych
+m_4<- "
+
+ext=~adhd + cigs + cud + alc  
+psychosis=~scz + bp
+compulsive=~ocd + an 
+int=~mdd+anx + ptsd
+
+"
+
+m_4<- usermodel(covstruc=sleep_psychLDSC, model=m_4, 
+                estimation=estimation,std.lv=std.lv, imp_cov = F)
+save(m_4, file="finalmods/m_4.RData")
+
+### model 5, sleep health + psych*
+m_5<- "
+effic=~efficiency+episodesR
+alertness=~sleepinessR+diurnalR+nappingR
+timing=~chron+midR+m10R+l5R
+dur=~self_sleepdur
+reg=~sd_sleepdurR
+insom=~insomR
+sd_sleepdurR~~0*sd_sleepdurR
+insomR~~0*insomR
+self_sleepdur~~0*self_sleepdur
+
+efficiency~~a*efficiency
+a>.001
+
+ext=~adhd + cigs + cud + alc  
+psychosis=~scz + bp
+compulsive=~ocd + an 
+int=~mdd+anx + ptsd
+
+
+ext~~0.7365858870*ext
+int~~0.7178500*int
+compulsive~~0.9138224200*compulsive
+psychosis~~0.8850097878*psychosis
+
+"
+
+m_5<- usermodel(covstruc=sleep_psychLDSC, model=m_5, 
+                estimation=estimation,std.lv=std.lv, imp_cov = F)
+save(m_5, file="finalmods/m_5.RData")
+
+### model 6, SH with psych regressions 
+m_6<- "
+effic=~efficiency+episodesR
+alertness=~sleepinessR+diurnalR+nappingR
+timing=~chron+midR+m10R+l5R
+dur=~self_sleepdur
+reg=~sd_sleepdurR
+insom=~insomR
+sd_sleepdurR~~0*sd_sleepdurR
+insomR~~0*insomR
+self_sleepdur~~0*self_sleepdur
+
+efficiency~~a*efficiency
+a>.001
+
+ext=~adhd + cigs + cud + alc  
+psychosis=~scz + bp
+compulsive=~ocd + an 
+int=~mdd+anx + ptsd
+
+
+ext~effic+alertness+timing+reg+insom+dur
+int~effic+alertness+timing+reg+insom+dur
+psychosis~effic+alertness+timing+reg+insom+dur
+compulsive~effic+alertness+timing+reg+insom+dur
+
+
+ext~~0.7365858870*ext
+int~~0.7178500*int
+compulsive~~0.9138224200*compulsive
+psychosis~~0.8850097878*psychosis
+"
+
+m_6<- usermodel(covstruc=sleep_psychLDSC, model=m_6, 
+                estimation=estimation,std.lv=std.lv, imp_cov = F)
+
+save(m_6, file="finalmods/m_6.RData")
+
+### model 7 heirarchial sleep health + psych
+
+
+m_7<- "
+
+effic=~1*efficiency+episodesR
+alertness=~1*nappingR+sleepinessR+diurnalR
+timing=~chron+midR+m10R+l5R
+dur=~1*self_sleepdur
+reg=~1*sd_sleepdurR
+insom=~1*insomR
+sd_sleepdurR~~0*sd_sleepdurR
+insomR~~0*insomR
+self_sleepdur~~0*self_sleepdur
+
+efficiency~~a*efficiency
+a>.001
+
+
+SH=~NA*effic+alertness+timing+dur+reg+insom
+
+SH~~1*SH
+
+insom~~c*insom
+c>.001
+
+ext=~adhd + cigs + cud + alc  
+psychosis=~scz + bp
+compulsive=~ocd + an 
+int=~mdd+anx + ptsd
+
+
+"
+m_7<- usermodel(covstruc=sleep_psychLDSC, model=m_7, 
+                estimation=estimation,std.lv=F, imp_cov = F)
+
+save(m_7, file="finalmods/m_7.RData")
+
+
+### model 8, sleep health+psych,var predicting OCD and AN
+m_8<- "
+effic=~efficiency+episodesR
+alertness=~sleepinessR+diurnalR+nappingR
+timing=~chron+midR+m10R+l5R
+dur=~self_sleepdur
+reg=~sd_sleepdurR
+insom=~insomR
+sd_sleepdurR~~0*sd_sleepdurR
+insomR~~0*insomR
+self_sleepdur~~0*self_sleepdur
+
+efficiency~~a*efficiency
+a>.001
+
+
+ext=~adhd + cigs + cud + alc  
+psychosis=~scz + bp
+compulsive=~ocd + an 
+int=~mdd+anx + ptsd
+
+reg~~0*compulsive
+
+ocd~reg
+an~reg
+"
+
+m_8<- usermodel(covstruc=sleep_psychLDSC, model=m_8, 
+                                    estimation=estimation,std.lv=std.lv, imp_cov = F)
+
+save(m_8, file="finalmods/m_8.RData")
+
+### model 9: psych predicting sleep health
+m_9<- "
+effic=~efficiency+episodesR
+alertness=~sleepinessR+diurnalR+nappingR
+timing=~chron+midR+m10R+l5R
+dur=~self_sleepdur
+reg=~sd_sleepdurR
+insom=~insomR
+sd_sleepdurR~~0*sd_sleepdurR
+insomR~~0*insomR
+self_sleepdur~~0*self_sleepdur
+
+efficiency~~a*efficiency
+a>.001
+
+ext=~adhd + cigs + cud + alc  
+psychosis=~scz + bp
+compulsive=~ocd + an 
+int=~mdd+anx + ptsd
+
+effic~ext+int+psychosis+compulsive
+alertness~ext+int+psychosis+compulsive
+timing~ext+int+psychosis+compulsive
+reg~ext+int+psychosis+compulsive
+insom~ext+int+psychosis+compulsive
+dur~ext+int+psychosis+compulsive
+
+effic~~0.94718939*effic
+alertness~~0.78671334*alertness
+timing~~0.97556705*timing
+reg~~0.80189772*reg
+insom~~0.69522685*insom
+dur~~0.85801567*dur
+"
+
+m_9<- usermodel(covstruc=sleep_psychLDSC, model=m_9, 
+                                    estimation=estimation,std.lv=std.lv, imp_cov = F)
+
+save(m_9, file="finalmods/m_9.RData")
+
+
+
+#############################################
+
+### fdr
+
+mods<- paste0("m_", seq(1,9,1))
+resultsout<- list()
+modelfitout<- list()
+for (i in mods) {
+  load(paste0("finalmods/",i,".RData"))
+  dat<- eval(parse(text=i))
+  fdr<- p.adjust(dat[[2]][,9], "fdr")
+  resultsout[[i]]<- cbind(dat[[2]],fdr)
+  modelfitout$chisq[i]<-  dat[[1]][1,1]
+  modelfitout$df[i]<-  dat[[1]][1,2]
+  modelfitout$chisqp[i]<-  dat[[1]][1,3]
+  modelfitout$AIC[i]<-  dat[[1]][1,4]
+  modelfitout$cfi[i]<-  dat[[1]][1,5]
+  modelfitout$rmsea[i]<-  dat[[1]][1,6]
+}
+
+save(resultsout, file="sleep_results_fdr.RData")
+save(modelfitout, file="sleep_fit_fdr.RData")
+```
+
+
+
+```{r}
+load("sleep_results_fdr.RData")
+load("sleep_fit_fdr.RData")
+```
+
+
+### plot findings
+
+```{r rGs}
+library(data.table)
+library(ggplot2)
+
+rgs<- fread("/Users/clairemorrison/Documents/IBG:Lab/sleep_psychopathology//gsemfinal/figures/fullmod_factor_rGs.csv", header=T)
+rgs$CI<- rgs$se*1.96
+rgs$Trait<- factor(rgs$Trait, levels = rgs$Trait[4:1])
+head(rgs)
+
+
+rGs_new <- rgs                              # Replicate data
+rGs_new$Trait2 <- factor(rGs_new$Trait2,      # Reordering group factor levels
+                         levels = c("Circadian Preference", "Non Insomnia", "Regularity", "Alertness", "Efficiency", "Duration"))
+nrow(rgs)
+
+### make color vectors
+### order of psych = int, ext, t1, t2
+
+ns<- "black"
+sig<- "red"
+timing<- c(sig, ns, sig, ns)
+insom<- c(sig, sig, sig, ns)
+var<- c(sig, sig, sig, ns)
+alert<- c(sig, sig, sig, sig)
+effic<- c(sig, sig, ns, ns)
+dur<- c(sig, sig, sig, sig)
+
+
+
+
+
+### order of col vec is the order they appear in file
+colvec<- c(timing, effic, insom, alert, var, dur)
+sizevec<- ifelse(colvec=="black", 3, 4)
+p<- ggplot(data = rGs_new)+
+  geom_point(aes(x=rG, y=as.factor(Trait), group=Trait2),color=colvec, size=sizevec) + 
+  geom_errorbarh(aes(x = rG,y=Trait, xmin = rG-CI, xmax = rG+CI), height=.1)+
+  facet_wrap(~Trait2) +
+  theme_test(base_size = 20) +
+  ylab("") + 
+  geom_vline(xintercept = 0, linetype="dashed") +
+  scale_x_continuous(breaks = c(-.6, -.3, 0, .3, .6))
+
+p      
+
+
+```
