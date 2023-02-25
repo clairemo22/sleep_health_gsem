@@ -9,9 +9,17 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+from computing clsuter to load R:
+
+ml anaconda
+conda activate /projects/lessem/software/anaconda/envs/R-4.2.1
+
+R
+
 ```{r}
 require(GenomicSEM)
-load("/Users/clairemorrison/Documents/IBG:Lab/sleep_psychopathology/gsemfinal/output/sleep_psychNEWldsc.RData")
+load("/pl/active/friedman/studies/claire_ldsc_gsem/gsem/sleepLDSC_GWAS_06_2022.RData")
+load("/pl/active/friedman/studies/claire_ldsc_gsem/gsem/sleep_psychNEWldsc.RData")
 ```
 
 ### download all sleep sumstats
