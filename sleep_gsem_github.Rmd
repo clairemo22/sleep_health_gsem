@@ -693,6 +693,10 @@ corrplot(rgs, method = "color",
 ### FDR correct 
 
 ```{r}
+
+std.lv=T
+estimation="DWLS"
+
 ### model 1, sleep health 
 m_1<- "
 effic=~efficiency+episodesR
